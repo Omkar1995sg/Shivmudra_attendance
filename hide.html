@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>QR Attendance</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    #status { margin-top: 1.5rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h2>Mark Attendance</h2>
+
+  <form id="rollForm">
+    <label for="roll">Roll No:</label>
+    <select id="roll" required>
+      <option value="">--Select Roll No--</option>
+    </select><br><br>
+    <button type="submit">Mark Present</button>
+  </form>
+
+  <div id="status"></div>
+
+<script>
+(() => {
+  // 1. Build Roll No dropdown
+  const rollSel = document.getElementById('roll');
+  for (let i = 1; i <= 600; i++) {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = `J${i}`;
+    rollSel.appendChild(opt);
+  }
+
+  // 2. Google Form prefill setup
+  const viewURL       = 'https://docs.google.com/forms/d/e/1FAIpQLSdQeaLekkBw6LWSkvdzj_II7SXcW3avndf63dQmColcWgB1Tw/viewform';
+  const entryRoll     = 'entry.846968130';
+  const entryLocation = 'entry.718692023';
+  const entryAddress  = 'entry.1049514207';
+
+  // 3. Handle form submit
+  document.getElementById('rollForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const roll = rollSel.value;
+    if (!roll) {
+      alert('Please select your roll number.');
+      return;
+    }
+
+    document.getElementById('status').textContent = '📍 Fetching location…';
+
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lon = pos.coords.longitude.toFixed(6);
+      const loc = `${lat},${lon}`;
+
+      let address = 'Unknown';
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+          { headers: { 'User-Agent': 'qr-attendance-demo/1.0' } }
+        );
+        const j = await r.json();
+        address = j.display_name || 'Unknown';
+      } catch (err) {
+        console.warn('Reverse geocoding failed:', err);
+      }
+
+      // Build prefilled form URL with only email shown
+      const prefillURL = `${viewURL}?${entryRoll}=${encodeURIComponent(roll)}&${entryLocation}=${encodeURIComponent(loc)}&${entryAddress}=${encodeURIComponent(address)}`;
+
+      // Open Google Form
+      window.open(prefillURL, '_blank');
+
+      document.getElementById('status').innerHTML = `
+        ✅ Opened attendance form.<br>
+        Roll: <strong>${roll}</strong><br>
+        Location: ${loc}<br>
+        Address: ${address}`;
+    },
+    err => alert('Location error: ' + err.message),
+    { enableHighAccuracy: true, timeout: 10000 });
+  });
+})();
+</script>
+</body>
+</html>
